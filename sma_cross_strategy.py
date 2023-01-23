@@ -76,7 +76,6 @@ def sma_cross_strategy(dataframe:object,trading_sybol:str,quantity:int,tp_percen
     side = ''
     fastsma = dataframe['FastSMA'].values[:1][0]
     slowsma = dataframe['SlowSMA'].values[:1][0]
-    slowsma = 24.6
     current_price = float(dataframe['close'].values[:1][0])
     if last_cross == 'up':
         if fastsma < slowsma:

@@ -48,9 +48,10 @@ def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float
     return {'trading_symbol':trading_sybol,'side':side,'order_type':'Market','quantity':quantity,'order_price':current_price,'time_in_force':'ImmediateOrCancel','reduce_only':False,'close_on_trigger':False,'take_profit':tp,'stop_loss':sl,'timestamp':datetime_now()}
 
 def sma_cross_last_cross(dataframe:object):
+    df = dataframe.iloc[:-1 , :]
     trend = ''
     cross = ''
-    for index, row in dataframe.iterrows():
+    for index, row in df.iterrows():
         fastsma = row['FastSMA']
         slowsma = row['SlowSMA']
         if trend == '':
@@ -69,27 +70,27 @@ def sma_cross_last_cross(dataframe:object):
 def sma_cross_strategy(dataframe:object,trading_sybol:str,quantity:int,tp_percentage:float,sl_percentage:float):
     last_cross = sma_cross_last_cross(dataframe)
     side = ''
-    fastsma = dataframe['FastSMA'].values[:1]
-    slowsma = dataframe['SlowSMA'].values[:1]
+    fastsma = dataframe['FastSMA'].values[:1][0]
+    slowsma = dataframe['SlowSMA'].values[:1][0]
     current_price = float(dataframe['close'].values[:1][0])
     if last_cross == 'up':
         if fastsma < slowsma:
             side = 'SHORT'
-            tp = current_price - (current_price * take_prof_perc)
-            sl = current_price + (current_price * stop_loss_perc)
+            tp = current_price - (current_price * tp_percentage)
+            sl = current_price + (current_price * sl_percentage)
     if last_cross == 'down':
         if fastsma > slowsma:
             side = 'LONG'
-            tp = current_price + (current_price * take_prof_perc)
-            sl = current_price - (current_price * stop_loss_perc)
+            tp = current_price + (current_price * tp_percentage)
+            sl = current_price - (current_price * sl_percentage)
     if side in ['SHORT','LONG']:
         order_dict = get_order_dict(trading_sybol,side,quantity,current_price,tp,sl)
-        print(order_dict)
         order_log_file = 'order_log.csv'
         if os.path.exists(order_log_file):
             header = False
         else:
             header = True
+        ## -- Place Order -- ##
         df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
         side = pd.DataFrame([{'symbol_pair':pair,'order':'OPEN'}]).to_csv(f'{pair}_order_status.csv',mode='w')
 
@@ -99,6 +100,10 @@ def check_open_order(symbol_pair:str):
         df = pd.DataFrame([{'symbol_pair':pair,'order':'CLOSED'}]).to_csv(f'{pair}_order_status.csv',mode='w')
     df = pd.read_csv(filename)        
     return df['order'].values[:1][0]
+
+def close_order(symbol_pair:str):
+    filename = f'{symbol_pair}_order_status.csv'
+    df = pd.DataFrame([{'symbol_pair':pair,'order':'CLOSED'}]).to_csv(f'{pair}_order_status.csv',mode='w')
 
 def get_order_details(symbol:str):
     df = pd.read_csv(f'order_log.csv')
@@ -112,37 +117,42 @@ def get_order_details(symbol:str):
     stop_loss = df2['stop_loss'].values[:1][0]
     return side, order_price, take_profit, stop_loss
 
-def exist_strategy_stoploss(symbol:str,dataframe:object):
+def exit_strategy_stoploss(symbol:str,dataframe:object):
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
     current_price = dataframe['close'].values[:1]
+    close = False
+    close_side = ''
     if side == 'LONG':
         if current_price > take_profit:
-            side = 'LONG_CLOSED_TP'
+            close_side = 'LONG_CLOSED_TP'
+            close = True
         if current_price < stop_loss:
-            side = 'LONG_CLOSED_SL'
-        order_dict = get_order_dict(symbol,side,quantity,current_price,take_profit,stop_loss)
-        df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=False)
+            close_side = 'LONG_CLOSED_SL'
+            close = True
     if side == 'SHORT':
         if current_price < take_profit:
-            side = 'SHORT_CLOSED_TP'
+            close_side = 'SHORT_CLOSED_TP'
+            close = True
         if current_price > stop_loss:
-            side = 'SHORT_CLOSED_SL'
-        order_dict = get_order_dict(symbol,side,quantity,current_price,take_profit,stop_loss)
+            close_side = 'SHORT_CLOSED_SL'
+            close = True
+    if close:
+        ## -- Close Order -- ##
+        order_dict = get_order_dict(symbol,close_side,quantity,order_price,take_profit,stop_loss)
         df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=False)
+        close_order(symbol)
 
 if __name__ == '__main__':
-    while True:
-        time.sleep(60)
-        lookback_days = 6
-        pair = 'BTCUSDT'
-        quantity = 0.001
-        session_interval = 5
-        take_prof_perc = 0.02
-        stop_loss_perc = 0.005
-        order_status = check_open_order(pair)
-        session = int_session(pair)
-        bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
-        if order_status != 'OPEN':
-            sma_cross_strategy(bars,pair,quantity,take_prof_perc,stop_loss_perc)
-        else:
-            exist_strategy_stoploss(pair,bars)
+    lookback_days = 6
+    pair = 'SOLUSDT'
+    quantity = 0.001
+    session_interval = 60
+    take_prof_perc = 0.02
+    stop_loss_perc = 0.005
+    order_status = check_open_order(pair)
+    session = int_session(pair)
+    bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
+    if order_status != 'OPEN':
+        sma_cross_strategy(bars,pair,quantity,take_prof_perc,stop_loss_perc)
+    else:
+        exit_strategy_stoploss(pair,bars)

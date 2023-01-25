@@ -105,8 +105,10 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
         sl = current_price - (current_price * sl_percentage)
         return tp, sl
 
-def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,quantity:int,tp_percentage:float,sl_percentage:float,interval:int):
+def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int):
     last_cross, side, fastsma, slowsma, current_price, qty = get_candle_details(all_bars,candle)
+    tp = float(0)
+    sl = float(0)
     if last_cross == 'up':
         if fastsma < slowsma:
             side = 'SHORT'
@@ -116,7 +118,7 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,quantity:
             side = 'LONG'
             tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if side in ['SHORT','LONG']:
-        order_dict = get_order_dict(trading_sybol,side,quantity,current_price,tp,sl)
+        order_dict = get_order_dict(trading_sybol,side,qty,current_price,tp,sl)
         order_log_file = 'order_log.csv'
         if os.path.exists(order_log_file):
             header = False
@@ -168,13 +170,13 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
             close = True
     if close:
         ## -- Close Order -- ##
-        order_dict = get_order_dict(symbol,close_side,quantity,order_price,take_profit,stop_loss)
+        order_dict = get_order_dict(symbol,close_side,qty,order_price,take_profit,stop_loss)
         df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=False)
         close_order(symbol)
         if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
             ## -- TP - ORDER AGAIN -- ##
             tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
-            order_dict = get_order_dict(symbol,close_side,quantity,order_price,tp,sl)
+            order_dict = get_order_dict(symbol,close_side,qty,order_price,tp,sl)
             place_order(order_dict,True,symbol)
     return dict_format_info(symbol,interval,'OPEN',last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss)
 
@@ -191,24 +193,23 @@ def if_order_open(pair_list:list):
         
 
 if __name__ == '__main__':
-        if not os.path.exists:
-            os.mkdir('order_status')
-            pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
-        for pair in if_order_open(pairs):
-            quantity = 0.001
-            session_interval = 60 #minutes
-            if session_interval >= 60:
-                lookback_days = 3
-            elif session_interval < 60:
-                lookback_days = 1
-            take_prof_perc = 0.02
-            stop_loss_perc = 0.005
-            order_status = check_open_order(pair)
-            session = int_session(pair)
-            bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
-            latest_candle = pd.DataFrame(bars.iloc[0:1])
-            if order_status != 'OPEN':
-                current_details = sma_cross_strategy(bars,latest_candle,pair,quantity,take_prof_perc,stop_loss_perc,session_interval)
-            else:
-                current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval)
-            print(current_details)
+    if not os.path.exists:
+        os.mkdir('order_status')
+    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
+    for pair in if_order_open(pairs):
+        session_interval = 60 #minutes
+        if session_interval >= 60:
+            lookback_days = 3
+        elif session_interval < 60:
+            lookback_days = 1
+        take_prof_perc = 0.02
+        stop_loss_perc = 0.005
+        order_status = check_open_order(pair)
+        session = int_session(pair)
+        bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
+        latest_candle = pd.DataFrame(bars.iloc[0:1])
+        if order_status != 'OPEN':
+            current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval)
+        else:
+            current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval)
+        print(current_details)

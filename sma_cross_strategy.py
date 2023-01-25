@@ -193,7 +193,7 @@ def if_order_open(pair_list:list):
         
 
 if __name__ == '__main__':
-    if not os.path.exists:
+    if not os.path.exists('order_status'):
         os.mkdir('order_status')
     pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
     for pair in if_order_open(pairs):

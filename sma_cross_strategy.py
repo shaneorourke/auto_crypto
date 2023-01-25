@@ -65,7 +65,7 @@ def get_quantity(current_price:float):
 
 def place_order(order_dict:dict,header:bool,symbol_pair):
     df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
-    side = pd.DataFrame([{'symbol_pair':pair,'order':'OPEN'}]).to_csv(f'order_status/{pair}_order_status.csv',mode='w')
+    side = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'OPEN'}]).to_csv(f'order_status/{symbol_pair}_order_status.csv',mode='w')
 
 def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float,tp:float,sl:float):
     return {'trading_symbol':trading_sybol,'side':side,'order_type':'Market','quantity':quantity,'order_price':current_price,'time_in_force':'ImmediateOrCancel','reduce_only':False,'close_on_trigger':False,'take_profit':tp,'stop_loss':sl,'timestamp':datetime_now()}
@@ -125,7 +125,7 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
         else:
             header = True
         ## -- Place Order -- ##
-        place_order(order_dict,header,pair)
+        place_order(order_dict,header,trading_sybol)
     return dict_format_info(trading_sybol,interval,'NOT OPEN',last_cross,side,fastsma,slowsma,current_price,qty,tp,sl)
 
 def check_open_order(symbol_pair:str):
@@ -191,8 +191,7 @@ def if_order_open(pair_list:list):
             not_open.append(currency)
     return not_open
         
-
-if __name__ == '__main__':
+def main_funtion():
     if not os.path.exists('order_status'):
         os.mkdir('order_status')
     pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
@@ -213,3 +212,7 @@ if __name__ == '__main__':
         else:
             current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval)
         print(current_details)
+
+
+if __name__ == '__main__':
+        main_funtion()

@@ -149,7 +149,7 @@ def get_candle_details(df_history:object,df_current:object):
     slowsma = df_current['SlowSMA'].values[:1][0]
     current_price = float(df_current['close'].values[:1][0])
     volume = df_current['volume'].values[:1][0]
-    force_index = volume = df_current['force_index'].values[:1][0]
+    force_index = df_current['force_index'].values[:1][0]
     qty = get_quantity(current_price)
     return last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index
 
@@ -216,10 +216,12 @@ def main_funtion():
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         if order_status != 'OPEN':
             current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval)
+            print(current_details)
+            if True in [True if value == 'OPEN' else False for value in current_details.values()]:
+                break
         else:
             current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval)
-        print(current_details)
-
+            print(current_details)
 
 if __name__ == '__main__':
     main_funtion()

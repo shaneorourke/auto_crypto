@@ -164,7 +164,7 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,tp_percentage:float,sl_pe
 
 if __name__ == '__main__':
         lookback_days = 6
-        pairs = ['BTCUSDT']
+        pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT']
         for pair in pairs:
             quantity = 0.001
             session_interval = 60*4

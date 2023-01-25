@@ -65,59 +65,13 @@ def get_quantity(current_price:float):
 
 def place_order(order_dict:dict,header:bool,symbol_pair):
     df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
-    side = pd.DataFrame([{'symbol_pair':pair,'order':'OPEN'}]).to_csv(f'{pair}_order_status.csv',mode='w')
+    side = pd.DataFrame([{'symbol_pair':pair,'order':'OPEN'}]).to_csv(f'order_status/{pair}_order_status.csv',mode='w')
 
 def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float,tp:float,sl:float):
     return {'trading_symbol':trading_sybol,'side':side,'order_type':'Market','quantity':quantity,'order_price':current_price,'time_in_force':'ImmediateOrCancel','reduce_only':False,'close_on_trigger':False,'take_profit':tp,'stop_loss':sl,'timestamp':datetime_now()}
 
-def sma_cross_last_cross(dataframe:object):
-    df = dataframe.iloc[:-1 , :]
-    for index, row in df.iterrows():
-        fastsma = row['FastSMA']
-        slowsma = row['SlowSMA']
-        if fastsma > slowsma:
-            return 'up'
-        if fastsma < slowsma:
-            return 'down'
-
-def sma_cross_strategy(dataframe:object,trading_sybol:str,quantity:int,tp_percentage:float,sl_percentage:float):
-    last_cross = sma_cross_last_cross(dataframe)
-    side = ''
-    fastsma = dataframe['FastSMA'].values[:1][0]
-    slowsma = dataframe['SlowSMA'].values[:1][0]
-    current_price = float(dataframe['close'].values[:1][0])
-    qty = get_quantity(current_price)
-    if last_cross == 'up':
-        if fastsma < slowsma:
-            side = 'SHORT'
-            tp = current_price - (current_price * tp_percentage)
-            sl = current_price + (current_price * sl_percentage)
-    if last_cross == 'down':
-        if fastsma > slowsma:
-            side = 'LONG'
-            tp = current_price + (current_price * tp_percentage)
-            sl = current_price - (current_price * sl_percentage)
-    if side in ['SHORT','LONG']:
-        order_dict = get_order_dict(trading_sybol,side,quantity,current_price,tp,sl)
-        order_log_file = 'order_log.csv'
-        if os.path.exists(order_log_file):
-            header = False
-        else:
-            header = True
-        ## -- Place Order -- ##
-        place_order(order_dict,header,pair)
-    return {'trading_sybol':trading_sybol,'last_cross':last_cross,'side':side,'fastsma':fastsma,'slowsma':slowsma,'current_price':current_price,'quantity':qty,'timestamp':datetime_now()}
-
-def check_open_order(symbol_pair:str):
-    filename = f'{symbol_pair}_order_status.csv'
-    if not os.path.exists(filename):
-        df = pd.DataFrame([{'symbol_pair':pair,'order':'CLOSED'}]).to_csv(f'{pair}_order_status.csv',mode='w')
-    df = pd.read_csv(filename)        
-    return df['order'].values[:1][0]
-
-def close_order(symbol_pair:str):
-    filename = f'{symbol_pair}_order_status.csv'
-    df = pd.DataFrame([{'symbol_pair':pair,'order':'CLOSED'}]).to_csv(f'{pair}_order_status.csv',mode='w')
+def dict_format_info(trading_sybol:str,interval:int,order_status:str,last_cross:str,side:str,fastsma:float,slowsma:float,current_price:float,qty:float,take_profit:float,stop_loss:float):
+    return {'trading_sybol':trading_sybol,'interval':interval,'order_status':order_status,'last_cross':last_cross,'side':side,'fastsma':fastsma,'slowsma':slowsma,'current_price':current_price,'take_profit':take_profit,'stop_loss':stop_loss,'quantity':qty,'timestamp':datetime_now()}
 
 def get_order_details(symbol:str):
     df = pd.read_csv(f'order_log.csv')
@@ -131,9 +85,71 @@ def get_order_details(symbol:str):
     stop_loss = df2['stop_loss'].values[:1][0]
     return side, order_price, take_profit, stop_loss
 
-def exit_strategy_stoploss(symbol:str,dataframe:object,tp_percentage:float,sl_percentage:float):
+def sma_cross_last_cross(dataframe:object):
+    dataframe.drop(index=dataframe.index[0], axis=0, inplace=True)
+    for index, row in dataframe.iterrows():
+        fastsma = row['FastSMA']
+        slowsma = row['SlowSMA']
+        if fastsma > slowsma:
+            return 'up'
+        if fastsma < slowsma:
+            return 'down'
+
+def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_percentage:float):
+    if side == 'SHORT':
+        tp = current_price - (current_price * tp_percentage)
+        sl = current_price + (current_price * sl_percentage)
+        return tp, sl
+    if side == 'LONG':
+        tp = current_price + (current_price * tp_percentage)
+        sl = current_price - (current_price * sl_percentage)
+        return tp, sl
+
+def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,quantity:int,tp_percentage:float,sl_percentage:float,interval:int):
+    last_cross, side, fastsma, slowsma, current_price, qty = get_candle_details(all_bars,candle)
+    if last_cross == 'up':
+        if fastsma < slowsma:
+            side = 'SHORT'
+            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+    if last_cross == 'down':
+        if fastsma > slowsma:
+            side = 'LONG'
+            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+    if side in ['SHORT','LONG']:
+        order_dict = get_order_dict(trading_sybol,side,quantity,current_price,tp,sl)
+        order_log_file = 'order_log.csv'
+        if os.path.exists(order_log_file):
+            header = False
+        else:
+            header = True
+        ## -- Place Order -- ##
+        place_order(order_dict,header,pair)
+    return dict_format_info(trading_sybol,interval,'NOT OPEN',last_cross,side,fastsma,slowsma,current_price,qty,tp,sl)
+
+def check_open_order(symbol_pair:str):
+    filename = f'order_status/{symbol_pair}_order_status.csv'
+    if not os.path.exists(filename):
+        df = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'CLOSED'}]).to_csv(f'{filename}',mode='w')
+    df = pd.read_csv(filename)        
+    return df['order'].values[:1][0]
+
+def close_order(symbol_pair:str):
+    filename = f'order_status/{symbol_pair}_order_status.csv'
+    df = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'CLOSED'}]).to_csv(f'{filename}',mode='w')
+
+def get_candle_details(df_history:object,df_current:object):
+    last_cross = sma_cross_last_cross(df_history)
+    side = ''
+    fastsma = df_current['FastSMA'].values[:1][0]
+    slowsma = df_current['SlowSMA'].values[:1][0]
+    current_price = float(df_current['close'].values[:1][0])
+    qty = get_quantity(current_price)
+    return last_cross, side, fastsma, slowsma, current_price, qty
+
+
+def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int):
+    last_cross, side, fastsma, slowsma, current_price, qty = get_candle_details(history_df,dataframe)
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
-    current_price = dataframe['close'].values[:1]
     close = False
     close_side = ''
     if side == 'LONG':
@@ -157,24 +173,42 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,tp_percentage:float,sl_pe
         close_order(symbol)
         if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
             ## -- TP - ORDER AGAIN -- ##
-            tp = current_price + (current_price * tp_percentage)
-            sl = current_price - (current_price * sl_percentage)
+            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
             order_dict = get_order_dict(symbol,close_side,quantity,order_price,tp,sl)
             place_order(order_dict,True,symbol)
+    return dict_format_info(symbol,interval,'OPEN',last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss)
+
+def if_order_open(pair_list:list):
+    not_open = []
+    open = []
+    for currency in pair_list:
+        order_status = check_open_order(currency)
+        if order_status == 'OPEN':
+            return [currency]
+        else:
+            not_open.append(currency)
+    return not_open
+        
 
 if __name__ == '__main__':
-        lookback_days = 6
-        pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT']
-        for pair in pairs:
+        if not os.path.exists:
+            os.mkdir('order_status')
+            pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
+        for pair in if_order_open(pairs):
             quantity = 0.001
-            session_interval = 60
+            session_interval = 60 #minutes
+            if session_interval >= 60:
+                lookback_days = 3
+            elif session_interval < 60:
+                lookback_days = 1
             take_prof_perc = 0.02
             stop_loss_perc = 0.005
             order_status = check_open_order(pair)
             session = int_session(pair)
             bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
+            latest_candle = pd.DataFrame(bars.iloc[0:1])
             if order_status != 'OPEN':
-                current_details = sma_cross_strategy(bars,pair,quantity,take_prof_perc,stop_loss_perc)
-                print(current_details)
+                current_details = sma_cross_strategy(bars,latest_candle,pair,quantity,take_prof_perc,stop_loss_perc,session_interval)
             else:
-                exit_strategy_stoploss(pair,bars,take_prof_perc,stop_loss_perc)
+                current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval)
+            print(current_details)

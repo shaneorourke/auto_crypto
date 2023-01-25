@@ -167,7 +167,7 @@ if __name__ == '__main__':
         pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT']
         for pair in pairs:
             quantity = 0.001
-            session_interval = 60*4
+            session_interval = 60
             take_prof_perc = 0.02
             stop_loss_perc = 0.005
             order_status = check_open_order(pair)

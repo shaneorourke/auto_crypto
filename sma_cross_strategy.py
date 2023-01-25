@@ -213,7 +213,6 @@ def main_funtion():
         order_status = check_open_order(pair)
         session = int_session(pair)
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
-        print(bars)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         if order_status != 'OPEN':
             current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval)

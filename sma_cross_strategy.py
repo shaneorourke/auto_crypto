@@ -199,8 +199,10 @@ def main_funtion():
         session_interval = 60 #minutes
         if session_interval >= 60:
             lookback_days = 3
-        elif session_interval < 60:
+        elif session_interval < 60 and session_interval >= 15:
             lookback_days = 1
+        elif session_interval < 15:
+            lookback_days = 0.25
         take_prof_perc = 0.02
         stop_loss_perc = 0.005
         order_status = check_open_order(pair)

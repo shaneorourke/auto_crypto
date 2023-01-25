@@ -72,23 +72,13 @@ def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float
 
 def sma_cross_last_cross(dataframe:object):
     df = dataframe.iloc[:-1 , :]
-    trend = ''
-    cross = ''
     for index, row in df.iterrows():
         fastsma = row['FastSMA']
         slowsma = row['SlowSMA']
-        if trend == '':
-            if fastsma > slowsma:
-                    trend = 'up'
-            if fastsma < slowsma:
-                    trend = 'down'
-        if cross == '':
-            if trend == 'down':
-                if fastsma > slowsma:
-                    return 'down' #This is the inverse of the truth - as working backwards
-            if trend == 'up':
-                if fastsma < slowsma:
-                    return 'up' #This is the inverse of the truth - as working backwards
+        if fastsma > slowsma:
+            return 'up'
+        if fastsma < slowsma:
+            return 'down'
 
 def sma_cross_strategy(dataframe:object,trading_sybol:str,quantity:int,tp_percentage:float,sl_percentage:float):
     last_cross = sma_cross_last_cross(dataframe)
@@ -173,18 +163,18 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,tp_percentage:float,sl_pe
             place_order(order_dict,True,symbol)
 
 if __name__ == '__main__':
-    lookback_days = 6
-    pairs = ['DOGEUSDT','BTCUSDT','SOLUSDT']
-    for pair in pairs:
-        quantity = 0.001
-        session_interval = 60
-        take_prof_perc = 0.02
-        stop_loss_perc = 0.005
-        order_status = check_open_order(pair)
-        session = int_session(pair)
-        bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
-        if order_status != 'OPEN':
-            current_details = sma_cross_strategy(bars,pair,quantity,take_prof_perc,stop_loss_perc)
-            print(current_details)
-        else:
-            exit_strategy_stoploss(pair,bars,take_prof_perc,stop_loss_perc)
+        lookback_days = 6
+        pairs = ['BTCUSDT']
+        for pair in pairs:
+            quantity = 0.001
+            session_interval = 60*4
+            take_prof_perc = 0.02
+            stop_loss_perc = 0.005
+            order_status = check_open_order(pair)
+            session = int_session(pair)
+            bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
+            if order_status != 'OPEN':
+                current_details = sma_cross_strategy(bars,pair,quantity,take_prof_perc,stop_loss_perc)
+                print(current_details)
+            else:
+                exit_strategy_stoploss(pair,bars,take_prof_perc,stop_loss_perc)

@@ -58,7 +58,7 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
         trend_interval = "D"
-        lookback_days = 10
+        lookback_days = 15
     elif session_interval == 30:
         trend_interval = 60*4
         lookback_days = 5
@@ -78,6 +78,8 @@ def get_trend(symbol_pair:str,session_interval:int,session:object):
         if index > 0:
             if row['close'] > bars['close'].iloc[index-1]:
                 candle_trends.append('up')
+            elif row['close'] > bars['close'].iloc[index-1]:
+                candle_trends.append('mid')
             else:
                 candle_trends.append('down')
     return str(max(set(candle_trends), key=candle_trends.count))
@@ -284,6 +286,7 @@ def main_funtion():
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session,True,True)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         trend = get_trend(pair,session_interval,session)
+        print(trend)
         if order_status != 'OPEN':
             current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend)
             print(current_details)

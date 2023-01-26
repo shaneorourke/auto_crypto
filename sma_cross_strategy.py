@@ -34,7 +34,7 @@ def apply_technicals(df:object,session_interval:int):
     df['%D'] = df['%K'].rolling(3).mean()
     df['rsi'] = ta.momentum.rsi(df.close,window=14)
     df['macd'] = ta.trend.macd_diff(df.close)
-    df['force_index'] = ta.volume.force_index(df.close,df.volume,window=25,fillna=False)
+    df['force_index'] = ta.volume.force_index(df.close,df.volume,window=13,fillna=False)
     df.dropna(inplace=True)
 
 def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:object):
@@ -222,7 +222,7 @@ def main_funtion():
         os.mkdir('order_status')
     pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
     for pair in if_order_open(pairs):
-        session_interval = 30 #minutes
+        session_interval = 60 #minutes
         if session_interval > 60:
             lookback_days = 3
             take_prof_perc = 0.02

@@ -40,11 +40,22 @@ def apply_technicals(df:object,session_interval:int):
 def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:object):
     response = session.query_kline(symbol=symbol_pair,interval=session_interval,from_time=starttime)
     df = pd.DataFrame(response['result'])
-    df.start_at = pd.to_datetime(df.start_at,unit='s') + pd.DateOffset(hours=1)
-    df.open_time = pd.to_datetime(df.open_time,unit='s') + pd.DateOffset(hours=1)
+    df.start_at = pd.to_datetime(df.start_at,unit='s') #+ pd.DateOffset(hours=1)
+    df.open_time = pd.to_datetime(df.open_time,unit='s') #+ pd.DateOffset(hours=1)
     apply_technicals(df,session_interval)
     df.sort_index(ascending=False,inplace=True)
     return df
+
+def stoploss_sleep_time_calculator(open_time:str,interval:int):
+    dt_time_now = dt.datetime.strptime(str(dt.datetime.now()),'%Y-%m-%d %H:%M:%S.%f')
+    open_at_time = dt.datetime.strptime(str(open_time)[:-3],'%Y-%m-%dT%H:%M:%S.%f')
+    difference = dt_time_now - open_at_time
+    seconds_in_day = 24 * 60 * 60
+    min_delay = divmod(difference.days * seconds_in_day + difference.seconds, 60)[0]
+    sec_delay = divmod(difference.days * seconds_in_day + difference.seconds, 60)[1]
+    delay = (interval - (min_delay + sec_delay/60) + 30/60) * 60
+    return delay
+
 
 def truncate(number:float, decimal_places:int):
     if decimal_places < 0:
@@ -107,9 +118,10 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
         return tp, sl
 
 def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int):
-    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index = get_candle_details(all_bars,candle)
+    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval)
     tp = float(0)
     sl = float(0)
+    order_status = 'NOT OPEN'
     if last_cross == 'up':
         if fastsma < slowsma:
             if force_index < 0:
@@ -129,7 +141,8 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
             header = True
         ## -- Place Order -- ##
         place_order(order_dict,header,trading_sybol)
-    return dict_format_info(trading_sybol,interval,'NOT OPEN',last_cross,side,fastsma,slowsma,current_price,qty,tp,sl,volume,force_index)
+        order_status = 'OPEN'
+    return dict_format_info(trading_sybol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,tp,sl,volume,force_index)
 
 def check_open_order(symbol_pair:str):
     filename = f'order_status/{symbol_pair}_order_status.csv'
@@ -142,7 +155,7 @@ def close_order(symbol_pair:str):
     filename = f'order_status/{symbol_pair}_order_status.csv'
     df = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'CLOSED'}]).to_csv(f'{filename}',mode='w')
 
-def get_candle_details(df_history:object,df_current:object):
+def get_candle_details(df_history:object,df_current:object,interval:int):
     last_cross = sma_cross_last_cross(df_history)
     side = ''
     fastsma = df_current['FastSMA'].values[:1][0]
@@ -150,15 +163,18 @@ def get_candle_details(df_history:object,df_current:object):
     current_price = float(df_current['close'].values[:1][0])
     volume = df_current['volume'].values[:1][0]
     force_index = df_current['force_index'].values[:1][0]
+    open_time = df_current['open_time'].values[:1][0]
+    stoploss_sleep_time = stoploss_sleep_time_calculator(open_time,interval)
     qty = get_quantity(current_price)
-    return last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index
+    return last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time
 
 
 def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int):
-    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index = get_candle_details(history_df,dataframe)
+    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(history_df,dataframe,interval)
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
     close = False
     close_side = ''
+    order_status = 'OPEN'
     if side == 'LONG':
         if current_price > take_profit:
             close_side = 'LONG_CLOSED_TP'
@@ -178,12 +194,17 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
         order_dict = get_order_dict(symbol,close_side,qty,order_price,take_profit,stop_loss)
         df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=False)
         close_order(symbol)
+        order_status = close_side
         if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
             ## -- TP - ORDER AGAIN -- ##
             tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
             order_dict = get_order_dict(symbol,close_side,qty,order_price,tp,sl)
             place_order(order_dict,True,symbol)
-    return dict_format_info(symbol,interval,'OPEN',last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss,volume,force_index)
+            order_status = 'OPEN'
+        else:
+            #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
+            time.sleep(stoploss_sleep_time)
+    return dict_format_info(symbol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss,volume,force_index)
 
 def if_order_open(pair_list:list):
     not_open = []
@@ -201,15 +222,23 @@ def main_funtion():
         os.mkdir('order_status')
     pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
     for pair in if_order_open(pairs):
-        session_interval = 60 #minutes
-        if session_interval >= 60:
+        session_interval = 30 #minutes
+        if session_interval > 60:
             lookback_days = 3
-        elif session_interval < 60 and session_interval >= 15:
+            take_prof_perc = 0.02
+            stop_loss_perc = 0.01
+        elif session_interval <= 60 and session_interval > 30:
+            lookback_days = 3
+            take_prof_perc = 0.02
+            stop_loss_perc = 0.01
+        elif session_interval <= 30 and session_interval >= 15:
             lookback_days = 1
+            take_prof_perc = 0.01
+            stop_loss_perc = 0.005
         elif session_interval < 15:
             lookback_days = 0.25
-        take_prof_perc = 0.02
-        stop_loss_perc = 0.005
+            take_prof_perc = 0.005
+            stop_loss_perc = 0.0025
         order_status = check_open_order(pair)
         session = int_session(pair)
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)

@@ -34,7 +34,7 @@ def int_session(symbol_pair):
     finally:
         return int_session
 
-def apply_technicals(df:object,session_interval:int):
+def apply_technicals(df:object,session_interval:int,dropna:bool):
     df['FastSMA'] = df.close.rolling(7).mean()
     df['SlowSMA'] = df.close.rolling(25).mean()
     df['%K'] = ta.momentum.stoch(df.high,df.low,df.close,window=14,smooth_window=3)
@@ -42,16 +42,46 @@ def apply_technicals(df:object,session_interval:int):
     df['rsi'] = ta.momentum.rsi(df.close,window=14)
     df['macd'] = ta.trend.macd_diff(df.close)
     df['force_index'] = ta.volume.force_index(df.close,df.volume,window=13,fillna=False)
-    df.dropna(inplace=True)
+    if dropna:
+        df.dropna(inplace=True)
 
-def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:object):
+def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:object,applytech:bool,dropna:bool):
     response = session.query_kline(symbol=symbol_pair,interval=session_interval,from_time=starttime)
     df = pd.DataFrame(response['result'])
     df.start_at = pd.to_datetime(df.start_at,unit='s') #+ pd.DateOffset(hours=1)
     df.open_time = pd.to_datetime(df.open_time,unit='s') #+ pd.DateOffset(hours=1)
-    apply_technicals(df,session_interval)
+    if applytech:
+        apply_technicals(df,session_interval,dropna)
     df.sort_index(ascending=False,inplace=True)
     return df
+
+def get_trend(symbol_pair:str,session_interval:int,session:object):
+    if session_interval == 60:
+        trend_interval = "D"
+        lookback_days = 10
+    elif session_interval == 30:
+        trend_interval = 60*4
+        lookback_days = 5
+    elif session_interval == 15:
+        trend_interval = 60
+        lookback_days = 3
+    elif session_interval == 5:
+        trend_interval = 30
+        lookback_days = 1
+    else:
+        trend_interval = "D"
+        lookback_days = 5
+    bars = get_bybit_bars(get_timestamp(lookback_days),symbol_pair,trend_interval,session,False,False)
+    bars.sort_index(ascending=True,inplace=True)
+    candle_trends = []
+    for index, row in bars.iterrows():
+        if index > 0:
+            if row['close'] > bars['close'].iloc[index-1]:
+                candle_trends.append('up')
+            else:
+                candle_trends.append('down')
+    return str(max(set(candle_trends), key=candle_trends.count))
+        
 
 def stoploss_sleep_time_calculator(open_time:str,interval:int):
     dt_time_now = dt.datetime.strptime(str(dt.datetime.now()),'%Y-%m-%d %H:%M:%S.%f')
@@ -89,8 +119,8 @@ def place_order(order_dict:dict,header:bool,symbol_pair):
 def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float,tp:float,sl:float,dt_date_time_now:str):
     return {'trading_symbol':trading_sybol,'side':side,'order_type':'Market','quantity':quantity,'order_price':current_price,'time_in_force':'ImmediateOrCancel','reduce_only':False,'close_on_trigger':False,'take_profit':tp,'stop_loss':sl,'timestamp':dt_date_time_now}
 
-def dict_format_info(trading_sybol:str,interval:int,order_status:str,last_cross:str,side:str,fastsma:float,slowsma:float,current_price:float,qty:float,take_profit:float,stop_loss:float,volume:float,force_index:float,dt_date_time_now:str):
-    return {'trading_sybol':trading_sybol,'interval':interval,'order_status':order_status,'last_cross':last_cross,'side':side,'fastsma':fastsma,'slowsma':slowsma,'current_price':current_price,'take_profit':take_profit,'stop_loss':stop_loss,'quantity':qty,'volume':volume,'force_index':force_index,'timestamp':dt_date_time_now}
+def dict_format_info(trading_sybol:str,interval:int,order_status:str,last_cross:str,side:str,fastsma:float,slowsma:float,current_price:float,qty:float,take_profit:float,stop_loss:float,volume:float,force_index:float,market_direction:str,dt_date_time_now:str):
+    return {'trading_sybol':trading_sybol,'interval':interval,'order_status':order_status,'last_cross':last_cross,'side':side,'fastsma':fastsma,'slowsma':slowsma,'current_price':current_price,'take_profit':take_profit,'stop_loss':stop_loss,'quantity':qty,'volume':volume,'force_index':force_index,'market_direction':market_direction,'timestamp':dt_date_time_now}
 
 def get_order_details(symbol:str):
     df = pd.read_csv(f'order_log.csv')
@@ -124,7 +154,7 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
         sl = current_price - (current_price * sl_percentage)
         return tp, sl
 
-def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str):
+def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval)
     tp = float(0)
     sl = float(0)
@@ -132,13 +162,15 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
     if last_cross == 'up':
         if fastsma < slowsma:
             if force_index < 0:
-                side = 'SHORT'
-                tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+                if market_direction == 'down':
+                    side = 'SHORT'
+                    tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if last_cross == 'down':
         if fastsma > slowsma:
             if force_index > 0:
-                side = 'LONG'
-                tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+                if market_direction == 'up':
+                    side = 'LONG'
+                    tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if side in ['SHORT','LONG']:
         order_dict = get_order_dict(trading_sybol,side,qty,current_price,tp,sl,dt_date_time_now)
         order_log_file = 'order_log.csv'
@@ -149,7 +181,7 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
         ## -- Place Order -- ##
         place_order(order_dict,header,trading_sybol)
         order_status = 'OPEN'
-    return dict_format_info(trading_sybol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,tp,sl,volume,force_index,dt_date_time_now)
+    return dict_format_info(trading_sybol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,tp,sl,volume,force_index,market_direction,dt_date_time_now)
 
 def check_open_order(symbol_pair:str):
     filename = f'order_status/{symbol_pair}_order_status.csv'
@@ -176,7 +208,7 @@ def get_candle_details(df_history:object,df_current:object,interval:int):
     return last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time
 
 
-def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str):
+def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(history_df,dataframe,interval)
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
     close = False
@@ -211,7 +243,7 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
         else:
             #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
             time.sleep(stoploss_sleep_time)
-    return dict_format_info(symbol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss,volume,force_index,dt_date_time_now)
+    return dict_format_info(symbol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss,volume,force_index,market_direction,dt_date_time_now)
 
 def if_order_open(pair_list:list):
     not_open = []
@@ -249,17 +281,17 @@ def main_funtion():
             stop_loss_perc = 0.0025
         order_status = check_open_order(pair)
         session = int_session(pair)
-        bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session)
+        bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session,True,True)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
+        trend = get_trend(pair,session_interval,session)
         if order_status != 'OPEN':
-            current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now)
+            current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend)
             print(current_details)
             if True in [True if value == 'OPEN' else False for value in current_details.values()]:
                 break
         else:
-            current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now)
+            current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend)
             print(current_details)
 
 if __name__ == '__main__':
     main_funtion()
-        

@@ -1,5 +1,6 @@
 from pybit.usdt_perpetual import HTTP
 import pandas as pd
+import bybit_secrets as sc
 import datetime as dt
 import ta
 import time
@@ -26,7 +27,7 @@ def get_timestamp(lookback:int):
     return startTime
 
 def int_session(symbol_pair):
-    int_session = HTTP("https://api.bybit.com", api_key="", api_secret="", request_timeout=30)
+    int_session = HTTP("https://api.bybit.com", api_key=sc.API_KEY, api_secret=sc.API_SECRET, request_timeout=30)
     try:
         int_session.set_leverage(symbol=f'{symbol_pair}',buy_leverage=1,sell_leverage=1)
     except Exception as e:
@@ -95,6 +96,17 @@ def stoploss_sleep_time_calculator(open_time:str,interval:int):
     delay = (interval - (min_delay + sec_delay/60) + 30/60) * 60
     return delay
 
+def place_bybit_order(session:object,trading_symbol:str,order_side:str,quantity:float,buy_price:float,take_profit:float,stop_loss:float):
+    order_df = pd.DataFrame(session.place_active_order(symbol=trading_symbol,
+                                        side=f"{order_side}",
+                                        order_type="Market",
+                                        qty=quantity,
+                                        price=buy_price,
+                                        time_in_force="ImmediateOrCancel",
+                                        reduce_only=False,
+                                        close_on_trigger=False,
+                                        take_profit=take_profit,
+                                        stop_loss=stop_loss)['result'],index=[0])
 
 def truncate(number:float, decimal_places:int):
     if decimal_places < 0:
@@ -114,9 +126,15 @@ def get_quantity(current_price:float):
         decimals = 0 if len(str(round(current_price)))-1 == 0 else len(str(round(current_price)))-2
     return truncate(qty,decimals)
 
-def place_order(order_dict:dict,header:bool,symbol_pair):
-    df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
-    side = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'OPEN'}]).to_csv(f'order_status/{symbol_pair}_order_status.csv',mode='w')
+def place_order(order_dict:dict,header:bool,symbol_pair,session:object):
+    order_log = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
+    order_status_log = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'OPEN'}]).to_csv(f'order_status/{symbol_pair}_order_status.csv',mode='w')
+    side = order_dict['side']
+    quantity = order_dict['quantity']
+    order_price = order_dict['order_price']
+    take_profit = order_dict['take_profit']
+    stop_loss = order_dict['stop_loss']
+    place_bybit_order(session,symbol_pair,side,quantity,order_price,take_profit,stop_loss)
 
 def get_order_dict(trading_sybol:str,side:str,quantity:float,current_price:float,tp:float,sl:float,dt_date_time_now:str):
     return {'trading_symbol':trading_sybol,'side':side,'order_type':'Market','quantity':quantity,'order_price':current_price,'time_in_force':'ImmediateOrCancel','reduce_only':False,'close_on_trigger':False,'take_profit':tp,'stop_loss':sl,'timestamp':dt_date_time_now}
@@ -156,7 +174,7 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
         sl = current_price - (current_price * sl_percentage)
         return tp, sl
 
-def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str):
+def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval)
     tp = float(0)
     sl = float(0)
@@ -181,7 +199,7 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
         else:
             header = True
         ## -- Place Order -- ##
-        place_order(order_dict,header,trading_sybol)
+        place_order(order_dict,header,trading_sybol,session)
         order_status = 'OPEN'
     return dict_format_info(trading_sybol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,tp,sl,volume,force_index,market_direction,dt_date_time_now)
 
@@ -286,9 +304,8 @@ def main_funtion():
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session,True,True)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         trend = get_trend(pair,session_interval,session)
-        print(trend)
         if order_status != 'OPEN':
-            current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend)
+            current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend,session)
             print(current_details)
             if True in [True if value == 'OPEN' else False for value in current_details.values()]:
                 break

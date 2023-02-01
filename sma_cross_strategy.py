@@ -165,11 +165,11 @@ def sma_cross_last_cross(dataframe:object):
             return 'down'
 
 def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_percentage:float):
-    if side == 'SHORT':
+    if side == 'Sell':
         tp = current_price - (current_price * tp_percentage)
         sl = current_price + (current_price * sl_percentage)
         return tp, sl
-    if side == 'LONG':
+    if side == 'Buy':
         tp = current_price + (current_price * tp_percentage)
         sl = current_price - (current_price * sl_percentage)
         return tp, sl
@@ -183,15 +183,15 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
         if fastsma < slowsma:
             if force_index < 0:
                 if market_direction == 'down':
-                    side = 'SHORT'
+                    side = 'Sell'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if last_cross == 'down':
         if fastsma > slowsma:
             if force_index > 0:
                 if market_direction == 'up':
-                    side = 'LONG'
+                    side = 'Buy'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
-    if side in ['SHORT','LONG']:
+    if side in ['Sell','Buy']:
         order_dict = get_order_dict(trading_sybol,side,qty,current_price,tp,sl,dt_date_time_now)
         order_log_file = 'order_log.csv'
         if os.path.exists(order_log_file):
@@ -234,14 +234,14 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
     close = False
     close_side = ''
     order_status = 'OPEN'
-    if side == 'LONG':
+    if side == 'Buy':
         if current_price > take_profit:
             close_side = 'LONG_CLOSED_TP'
             close = True
         if current_price < stop_loss:
             close_side = 'LONG_CLOSED_SL'
             close = True
-    if side == 'SHORT':
+    if side == 'Sell':
         if current_price < take_profit:
             close_side = 'SHORT_CLOSED_TP'
             close = True

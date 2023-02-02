@@ -117,8 +117,14 @@ def truncate(number:float, decimal_places:int):
         factor = 10.0 ** decimal_places
         return math.trunc(number * factor) / factor
 
-def get_quantity(current_price:float):
-    wallet_usdt = float(30.00)
+def get_bybit_wallet_usdt(session:object):
+    wallet = pd.DataFrame(session.get_wallet_balance()['result'])
+    funds = wallet['USDT'].where(wallet.index == 'available_balance')
+    funds = funds.dropna()
+    return float([funds.values][0])
+
+def get_quantity(current_price:float,session:object):
+    wallet_usdt = get_bybit_wallet_usdt(session)
     qty = float(wallet_usdt / current_price)
     if current_price < float(10000):
         decimals = 0 if len(str(round(current_price)))-1 == 0 else len(str(round(current_price)))-1
@@ -175,7 +181,7 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
         return tp, sl
 
 def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
-    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval)
+    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval,session)
     tp = float(0)
     sl = float(0)
     order_status = 'NOT OPEN'
@@ -214,7 +220,7 @@ def close_order(symbol_pair:str):
     filename = f'order_status/{symbol_pair}_order_status.csv'
     df = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'CLOSED'}]).to_csv(f'{filename}',mode='w')
 
-def get_candle_details(df_history:object,df_current:object,interval:int):
+def get_candle_details(df_history:object,df_current:object,interval:int,session:object):
     last_cross = sma_cross_last_cross(df_history)
     side = ''
     fastsma = df_current['FastSMA'].values[:1][0]
@@ -224,11 +230,11 @@ def get_candle_details(df_history:object,df_current:object,interval:int):
     force_index = df_current['force_index'].values[:1][0]
     open_time = df_current['open_time'].values[:1][0]
     stoploss_sleep_time = stoploss_sleep_time_calculator(open_time,interval)
-    qty = get_quantity(current_price)
+    qty = get_quantity(current_price,session)
     return last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time
 
 
-def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str):
+def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(history_df,dataframe,interval)
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
     close = False
@@ -256,10 +262,10 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
         order_status = close_side
         if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
             ## -- TP - ORDER AGAIN -- ##
-            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
-            order_dict = get_order_dict(symbol,close_side,qty,order_price,tp,sl)
-            place_order(order_dict,True,symbol)
             order_status = 'OPEN'
+            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+            order_dict = get_order_dict(symbol,side,get_quantity(current_price,session),current_price,tp,sl,dt_date_time_now)
+            place_order(order_dict,True,symbol)
         else:
             #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
             time.sleep(stoploss_sleep_time)
@@ -310,7 +316,7 @@ def main_funtion():
             if True in [True if value == 'OPEN' else False for value in current_details.values()]:
                 break
         else:
-            current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend)
+            current_details = exit_strategy_stoploss(pair,latest_candle,bars,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend,session)
             print(current_details)
 
 if __name__ == '__main__':

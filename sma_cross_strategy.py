@@ -59,10 +59,10 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
         trend_interval = "D"
-        lookback_days = 15
+        lookback_days = 35
     elif session_interval == 30:
         trend_interval = 60*4
-        lookback_days = 5
+        lookback_days = 25
     elif session_interval == 15:
         trend_interval = 60
         lookback_days = 3
@@ -70,20 +70,16 @@ def get_trend(symbol_pair:str,session_interval:int,session:object):
         trend_interval = 30
         lookback_days = 1
     else:
-        trend_interval = "D"
+        trend_interval = 60*12
         lookback_days = 5
-    bars = get_bybit_bars(get_timestamp(lookback_days),symbol_pair,trend_interval,session,False,False)
-    bars.sort_index(ascending=True,inplace=True)
-    candle_trends = []
-    for index, row in bars.iterrows():
-        if index > 0:
-            if row['close'] > bars['close'].iloc[index-1]:
-                candle_trends.append('up')
-            elif row['close'] > bars['close'].iloc[index-1]:
-                candle_trends.append('mid')
-            else:
-                candle_trends.append('down')
-    return str(max(set(candle_trends), key=candle_trends.count))
+    bars = get_bybit_bars(get_timestamp(lookback_days),symbol_pair,trend_interval,session,True,False)
+    latest_candle = pd.DataFrame(bars.iloc[0:1])
+    fastSMA = float(latest_candle['FastSMA'])
+    slowSMA = float(latest_candle['SlowSMA'])
+    if fastSMA > slowSMA:
+        return 'up'
+    if fastSMA < slowSMA:
+        return 'down'
         
 
 def stoploss_sleep_time_calculator(open_time:str,interval:int):
@@ -265,7 +261,7 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
             order_status = 'OPEN'
             tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
             order_dict = get_order_dict(symbol,side,get_quantity(current_price,session),current_price,tp,sl,dt_date_time_now)
-            place_order(order_dict,True,symbol)
+            place_order(order_dict,False,symbol)
         else:
             #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
             time.sleep(stoploss_sleep_time)
@@ -310,6 +306,7 @@ def main_funtion():
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session,True,True)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         trend = get_trend(pair,session_interval,session)
+        print(trend)
         if order_status != 'OPEN':
             current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend,session)
             print(current_details)

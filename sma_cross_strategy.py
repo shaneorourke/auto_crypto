@@ -235,7 +235,7 @@ def get_candle_details(df_history:object,df_current:object,interval:int,session:
 
 
 def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
-    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(history_df,dataframe,interval)
+    last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(history_df,dataframe,interval,session)
     side, order_price, take_profit, stop_loss = get_order_details(symbol)
     close = False
     close_side = ''

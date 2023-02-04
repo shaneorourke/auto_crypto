@@ -119,14 +119,18 @@ def get_bybit_wallet_usdt(session:object):
     funds = funds.dropna()
     return float([funds.values][0])
 
+def get_truncate_decimal(value:float):
+    if value < float(10000):
+        decimals = 0 if len(str(round(value)))-1 == 0 else len(str(round(value)))-1
+    else:
+        decimals = 0 if len(str(round(value)))-1 == 0 else len(str(round(value)))-2
+    return decimals
+
 def get_quantity(current_price:float,session:object):
     wallet_usdt = get_bybit_wallet_usdt(session)
     qty = float(wallet_usdt / current_price)
-    if current_price < float(10000):
-        decimals = 0 if len(str(round(current_price)))-1 == 0 else len(str(round(current_price)))-1
-    else:
-        decimals = 0 if len(str(round(current_price)))-1 == 0 else len(str(round(current_price)))-2
-    return truncate(qty,decimals)
+    return truncate(qty,_decimal(current_price))
+
 
 def place_order(order_dict:dict,header:bool,symbol_pair,session:object):
     order_log = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
@@ -170,11 +174,11 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
     if side == 'Sell':
         tp = current_price - (current_price * tp_percentage)
         sl = current_price + (current_price * sl_percentage)
-        return tp, sl
+        return get_truncate_decimal(tp), get_truncate_decimal(sl)
     if side == 'Buy':
         tp = current_price + (current_price * tp_percentage)
         sl = current_price - (current_price * sl_percentage)
-        return tp, sl
+        return get_truncate_decimal(tp), get_truncate_decimal(sl)
 
 def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval,session)

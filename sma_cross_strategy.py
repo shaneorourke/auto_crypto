@@ -314,7 +314,6 @@ def main_funtion():
         bars = get_bybit_bars(get_timestamp(lookback_days),pair,session_interval,session,True,True)
         latest_candle = pd.DataFrame(bars.iloc[0:1])
         trend = get_trend(pair,session_interval,session)
-        print(trend)
         if order_status != 'OPEN':
             current_details = sma_cross_strategy(bars,latest_candle,pair,take_prof_perc,stop_loss_perc,session_interval,dt_date_time_now,trend,session)
             print(current_details)

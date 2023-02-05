@@ -123,11 +123,11 @@ def get_truncate_decimal(value:float):
     pre_decimal_len = str(value).find('.')
     post_decimal_len = len(str(value)[str(value).find('.')+1:])
     if pre_decimal_len >= 3:
-    	return 2
+        return 2
     if pre_decimal_len >= 2 and pre_decimal_len < 3:
-    	return 3
+        return 3
     if pre_decimal_len >= 1 and pre_decimal_len < 2:
-    	return 3
+        return 3
 
 
 def get_quantity(current_price:float,session:object):

@@ -120,11 +120,15 @@ def get_bybit_wallet_usdt(session:object):
     return float([funds.values][0])
 
 def get_truncate_decimal(value:float):
-    if value < float(10000):
-        decimals = 0 if len(str(round(value)))-1 == 0 else len(str(round(value)))-1
-    else:
-        decimals = 0 if len(str(round(value)))-1 == 0 else len(str(round(value)))-2
-    return decimals
+    pre_decimal_len = str(value).find('.')
+    post_decimal_len = len(str(value)[str(value).find('.')+1:])
+    if pre_decimal_len >= 3:
+    	return 2
+    if pre_decimal_len >= 2 and pre_decimal_len < 3:
+    	return 3
+    if pre_decimal_len >= 1 and pre_decimal_len < 2:
+    	return 3
+
 
 def get_quantity(current_price:float,session:object):
     wallet_usdt = get_bybit_wallet_usdt(session)

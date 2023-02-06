@@ -27,7 +27,7 @@ def get_timestamp(lookback:int):
     return startTime
 
 def int_session(symbol_pair):
-    int_session = HTTP("https://api.bybit.com", api_key=sc.API_KEY, api_secret=sc.API_SECRET, request_timeout=30)
+    int_session = HTTP("https://api.bybit.com", api_key=sc.API_KEY, api_secret=sc.API_SECRET, request_timeout=55)
     try:
         int_session.set_leverage(symbol=f'{symbol_pair}',buy_leverage=1,sell_leverage=1)
     except Exception as e:

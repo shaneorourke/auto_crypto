@@ -178,11 +178,11 @@ def take_profit_stop_loss(side:str,current_price:float,tp_percentage:float,sl_pe
     if side == 'Sell':
         tp = current_price - (current_price * tp_percentage)
         sl = current_price + (current_price * sl_percentage)
-        return get_truncate_decimal(tp), get_truncate_decimal(sl)
+        return truncate(tp,get_truncate_decimal(tp)), truncate(sl,get_truncate_decimal(sl))
     if side == 'Buy':
         tp = current_price + (current_price * tp_percentage)
         sl = current_price - (current_price * sl_percentage)
-        return get_truncate_decimal(tp), get_truncate_decimal(sl)
+        return truncate(tp,get_truncate_decimal(tp)), truncate(sl,get_truncate_decimal(sl))
 
 def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percentage:float,sl_percentage:float,interval:int,dt_date_time_now:str,market_direction:str,session:object):
     last_cross, side, fastsma, slowsma, current_price, volume, qty, force_index, stoploss_sleep_time = get_candle_details(all_bars,candle,interval,session)

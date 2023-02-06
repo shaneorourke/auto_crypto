@@ -138,7 +138,7 @@ def get_truncate_decimal(value:float):
 def get_quantity(current_price:float,session:object):
     wallet_usdt = get_bybit_wallet_usdt(session)
     qty = float(wallet_usdt / current_price)
-    return truncate(qty,get_truncate_decimal(current_price))
+    return truncate(qty,get_truncate_decimal(qty))
 
 
 def place_order(order_dict:dict,header:bool,symbol_pair,session:object):

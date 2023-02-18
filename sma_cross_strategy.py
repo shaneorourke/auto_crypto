@@ -58,20 +58,20 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
-        trend_interval = "D"
+        trend_interval = 60*4
         lookback_days = 35
     elif session_interval == 30:
-        trend_interval = 60*4
+        trend_interval = 60
         lookback_days = 25
     elif session_interval == 15:
-        trend_interval = 60
+        trend_interval = 30
         lookback_days = 3
     elif session_interval == 5:
-        trend_interval = 30
+        trend_interval = 15
         lookback_days = 1
     else:
-        trend_interval = 60*12
-        lookback_days = 5
+        trend_interval = 60*4
+        lookback_days = 35
     bars = get_bybit_bars(get_timestamp(lookback_days),symbol_pair,trend_interval,session,True,False)
     latest_candle = pd.DataFrame(bars.iloc[0:1])
     fastSMA = float(latest_candle['FastSMA'])
@@ -294,7 +294,7 @@ def if_order_open(pair_list:list):
 def main_funtion():
     if not os.path.exists('order_status'):
         os.mkdir('order_status')
-    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOTUSDT']
+    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
     for pair in if_order_open(pairs):
         dt_date_time_now = datetime_now()
         session_interval = 60 #minutes

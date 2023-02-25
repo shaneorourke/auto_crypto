@@ -294,7 +294,7 @@ def if_order_open(pair_list:list):
 def main_funtion():
     if not os.path.exists('order_status'):
         os.mkdir('order_status')
-    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
+    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOTUSDT']
     for pair in if_order_open(pairs):
         dt_date_time_now = datetime_now()
         session_interval = 60 #minutes

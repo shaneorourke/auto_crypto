@@ -58,16 +58,16 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
-        trend_interval = 60*4
+        trend_interval = '1D'
         lookback_days = 35
     elif session_interval == 30:
-        trend_interval = 60
+        trend_interval = 60*4
         lookback_days = 25
     elif session_interval == 15:
-        trend_interval = 30
+        trend_interval = 60
         lookback_days = 3
     elif session_interval == 5:
-        trend_interval = 15
+        trend_interval = 30
         lookback_days = 1
     else:
         trend_interval = 60*4
@@ -80,7 +80,22 @@ def get_trend(symbol_pair:str,session_interval:int,session:object):
         return 'up'
     if fastSMA < slowSMA:
         return 'down'
-        
+
+def force_index_trend(history:object):
+    df = history.sort_values(by=['open_time']).iloc[-6:-1]
+    min_index = df.index.min()
+    trend = []
+    for index, row in df.iterrows():
+        if index-1 > min_index:
+            current=row['force_index']
+            prev=df.at[index-1, 'force_index']
+            if prev < current:
+                trend.append('up')
+            elif prev > current:
+                trend.append('down')
+            else:
+                trend.append('neutral')
+    return trend[-1]        
 
 def stoploss_sleep_time_calculator(open_time:str,interval:int):
     dt_time_now = dt.datetime.strptime(str(dt.datetime.now()),'%Y-%m-%d %H:%M:%S.%f')
@@ -196,13 +211,13 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
     order_status = 'NOT OPEN'
     if last_cross == 'up':
         if fastsma < slowsma:
-            if force_index < 0:
+            if force_index_trend(all_bars) == 'down':
                 if market_direction == 'down':
                     side = 'Sell'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if last_cross == 'down':
         if fastsma > slowsma:
-            if force_index > 0:
+            if force_index_trend(all_bars) == 'up':
                 if market_direction == 'up':
                     side = 'Buy'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)

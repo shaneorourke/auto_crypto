@@ -58,7 +58,7 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
-        trend_interval = '1D'
+        trend_interval = 'D'
         lookback_days = 35
     elif session_interval == 30:
         trend_interval = 60*4

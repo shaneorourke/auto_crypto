@@ -114,7 +114,7 @@ if __name__ == '__main__':
         print(f'Long Profit:{round(LONG_CLOSED_TP_PROFIT,2)}')
         print(f'Short Profit:{round(SHORT_CLOSED_PROFIT,2)}')
         print(f'Long Losses:{round(LONG_CLOSED_SL_LOSS,2)}')
-        print(f'Short Losses:{round(SHORT_CLOSED_PROFIT,2)}')
+        print(f'Short Losses:{round(SHORT_CLOSED_SL_LOSS,2)}')
         print(f'Total Profit:{round(CURRENCY_TOTAL,2)}')
         print()
 

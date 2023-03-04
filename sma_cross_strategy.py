@@ -58,16 +58,16 @@ def get_bybit_bars(starttime:str,symbol_pair:str,session_interval:int,session:ob
 
 def get_trend(symbol_pair:str,session_interval:int,session:object):
     if session_interval == 60:
-        trend_interval = 'D'
+        trend_interval = 60*4
         lookback_days = 35
     elif session_interval == 30:
-        trend_interval = 60*4
+        trend_interval = 60
         lookback_days = 25
     elif session_interval == 15:
-        trend_interval = 60
+        trend_interval = 30
         lookback_days = 3
     elif session_interval == 5:
-        trend_interval = 30
+        trend_interval = 15
         lookback_days = 1
     else:
         trend_interval = 60*4
@@ -80,22 +80,7 @@ def get_trend(symbol_pair:str,session_interval:int,session:object):
         return 'up'
     if fastSMA < slowSMA:
         return 'down'
-
-def force_index_trend(history:object):
-    df = history.sort_values(by=['open_time']).iloc[-6:-1]
-    min_index = df.index.min()
-    trend = []
-    for index, row in df.iterrows():
-        if index-1 > min_index:
-            current=row['force_index']
-            prev=df.at[index-1, 'force_index']
-            if prev < current:
-                trend.append('up')
-            elif prev > current:
-                trend.append('down')
-            else:
-                trend.append('neutral')
-    return trend[-1]        
+        
 
 def stoploss_sleep_time_calculator(open_time:str,interval:int):
     dt_time_now = dt.datetime.strptime(str(dt.datetime.now()),'%Y-%m-%d %H:%M:%S.%f')
@@ -156,7 +141,7 @@ def get_quantity(current_price:float,session:object):
     return truncate(qty,get_truncate_decimal(qty))
 
 
-def place_order(order_dict:dict,header:bool,symbol_pair,session:object):
+def place_order(order_dict:dict,header:bool,symbol_pair:str,session:object):
     order_log = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=header)
     order_status_log = pd.DataFrame([{'symbol_pair':symbol_pair,'order':'OPEN'}]).to_csv(f'order_status/{symbol_pair}_order_status.csv',mode='w')
     side = order_dict['side']
@@ -211,13 +196,13 @@ def sma_cross_strategy(all_bars:object,candle:object,trading_sybol:str,tp_percen
     order_status = 'NOT OPEN'
     if last_cross == 'up':
         if fastsma < slowsma:
-            if force_index_trend(all_bars) == 'down':
+            if force_index < 0:
                 if market_direction == 'down':
                     side = 'Sell'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
     if last_cross == 'down':
         if fastsma > slowsma:
-            if force_index_trend(all_bars) == 'up':
+            if force_index > 0:
                 if market_direction == 'up':
                     side = 'Buy'
                     tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
@@ -289,7 +274,7 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
             order_status = 'OPEN'
             tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
             order_dict = get_order_dict(symbol,side,get_quantity(current_price,session),current_price,tp,sl,dt_date_time_now)
-            place_order(order_dict,False,symbol)
+            place_order(order_dict,False,symbol,session)
         else:
             #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
             time.sleep(stoploss_sleep_time)
@@ -309,7 +294,7 @@ def if_order_open(pair_list:list):
 def main_funtion():
     if not os.path.exists('order_status'):
         os.mkdir('order_status')
-    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOTUSDT']
+    pairs = ['BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT','DOGEUSDT','DOTUSDT']
     for pair in if_order_open(pairs):
         dt_date_time_now = datetime_now()
         session_interval = 60 #minutes

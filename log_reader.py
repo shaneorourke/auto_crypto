@@ -108,13 +108,15 @@ if __name__ == '__main__':
         SHORT_CLOSED_SL_ORDER_PRICE = sum(order_log['order_price'][(order_log['trading_symbol'] == pair) & (order_log['side'] == 'SHORT_CLOSED_SL')])
         SHORT_CLOSED_SL_LOSS = (SHORT_CLOSED_SL - SHORT_CLOSED_SL_ORDER_PRICE) * SHORT_CLOSE_SL_QUANTITY
 
-        total_profit = total_profit + LONG_CLOSED_TP_PROFIT + LONG_CLOSED_SL_LOSS + SHORT_CLOSED_PROFIT + SHORT_CLOSED_SL_LOSS
+        CURRENCY_TOTAL = LONG_CLOSED_TP_PROFIT + LONG_CLOSED_SL_LOSS + SHORT_CLOSED_PROFIT + SHORT_CLOSED_SL_LOSS
+        total_profit = total_profit + CURRENCY_TOTAL
         print(pair)
         print(f'Long Profit:{round(LONG_CLOSED_TP_PROFIT,2)}')
         print(f'Short Profit:{round(SHORT_CLOSED_PROFIT,2)}')
         print(f'Long Losses:{round(LONG_CLOSED_SL_LOSS,2)}')
         print(f'Short Losses:{round(SHORT_CLOSED_PROFIT,2)}')
+        print(f'Total Profit:{round(CURRENCY_TOTAL,2)}')
         print()
 
-    print(f'Total Profit:{round(total_profit,2)}')
+    print(f'Overall Profit:{round(total_profit,2)}')
 

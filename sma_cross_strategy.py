@@ -159,10 +159,7 @@ def dict_format_info(trading_sybol:str,interval:int,order_status:str,last_cross:
 
 def get_order_details(symbol:str):
     df = pd.read_csv(f'order_log.csv')
-    filter = df['trading_symbol']==symbol
-    df2 = df.where(filter, inplace = False)
-    df2 = df2.dropna()
-    df2 = df2.sort_values(by=['timestamp'],ascending=False)
+    df2 = df[(df['trading_symbol']==symbol) & (df['side'] != 'SHORT_CLOSED_SL') & (df['side'] != 'SHORT_CLOSED_TP') & (df['side'] != 'LONG_CLOSED_SL') & (df['side'] != 'LONG_CLOSED_TP')]       
     side = df2['side'].values[:1][0]
     order_price = df2['order_price'].values[:1][0]
     take_profit = df2['take_profit'].values[:1][0]

@@ -266,15 +266,15 @@ def exit_strategy_stoploss(symbol:str,dataframe:object,history_df:object,tp_perc
         df = pd.DataFrame([order_dict]).to_csv('order_log.csv',index=False,mode='a',header=False)
         close_order(symbol)
         order_status = close_side
-        if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
-            ## -- TP - ORDER AGAIN -- ##
-            order_status = 'OPEN'
-            tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
-            order_dict = get_order_dict(symbol,side,get_quantity(current_price,session),current_price,tp,sl,dt_date_time_now)
-            place_order(order_dict,False,symbol,session)
-        else:
-            #print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
-            time.sleep(stoploss_sleep_time)
+        #if close_side in ['SHORT_CLOSED_TP','LONG_CLOSED_TP']:
+            ### -- TP - ORDER AGAIN -- ##
+            #order_status = 'OPEN'
+            #tp, sl = take_profit_stop_loss(side,current_price,tp_percentage,sl_percentage)
+            #order_dict = get_order_dict(symbol,side,get_quantity(current_price,session),current_price,tp,sl,dt_date_time_now)
+            #place_order(order_dict,False,symbol,session)
+        #else:
+            ##print(f'Stop loss sleep - {stoploss_sleep_time*60} minutes')
+            #time.sleep(stoploss_sleep_time)
     return dict_format_info(symbol,interval,order_status,last_cross,side,fastsma,slowsma,current_price,qty,take_profit,stop_loss,volume,force_index,market_direction,dt_date_time_now)
 
 def if_order_open(pair_list:list):

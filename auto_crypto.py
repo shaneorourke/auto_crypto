@@ -259,5 +259,5 @@ logging.info(f"Symbol: {symbol} | Timeframe: {timeframe} | Close: {data['close']
 signal = check_sma_crossover(data)
 
 # Execute trade
-if signal != '':
+if signal:
     execute_trade(signal, risk_percentage, data['close'].iloc[-1])

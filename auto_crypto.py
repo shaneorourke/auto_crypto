@@ -1,4 +1,5 @@
 import os
+import sys
 from bybit_secrets import API_KEY, API_SECRET
 from pybit.unified_trading import HTTP
 import ta
@@ -36,7 +37,7 @@ log_folder = 'logs'
 os.makedirs(log_folder, exist_ok=True)
 
 # Configure logging
-log_file = datetime.now().strftime("%Y-%m-%d") + '.log'
+log_file = str(datetime.now().strftime("%Y-%m-%d")) + '.log'
 log_file_path = os.path.join(log_folder, log_file)
 logging.basicConfig(level=logging.INFO, filename=log_file_path, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -73,9 +74,14 @@ def apply_technicals(df: pd.DataFrame) -> None:
     :param df: The DataFrame to apply the technical indicators to.
     :type df: pd.DataFrame
     """
+    df['close'] = pd.to_numeric(df['close'])
     df['short_sma'] = ta.trend.sma_indicator(df['close'], window=short_sma_period)
+    df['short_sma'] = pd.to_numeric(df['short_sma'])
     df['long_sma'] = ta.trend.sma_indicator(df['close'], window=long_sma_period)
+    df['long_sma'] = pd.to_numeric(df['long_sma'])
     df['volume_sma'] = ta.trend.sma_indicator(df['volume'], window=30)
+    df['volume'] = pd.to_numeric(df['volume'])
+    df['volume_sma'] = pd.to_numeric(df['volume_sma'])
 
 def fetch_historical_data(symbol: str, timeframe: int) -> pd.DataFrame:
     """
@@ -119,14 +125,15 @@ def check_sma_crossover(data: pd.DataFrame) -> str:
     :return: The signal indicating whether to 'buy', 'sell', or None.
     :rtype: str
     """
-    if data['short_sma'].iloc[-2] < data['long_sma'].iloc[-2] and \
-            data['short_sma'].iloc[-1] > data['long_sma'].iloc[-1] and \
-            data['volume'].iloc[-1] > data['volume_sma'].iloc[-1]:
-        return 'buy'
-    elif data['short_sma'].iloc[-2] > data['long_sma'].iloc[-2] and \
-            data['short_sma'].iloc[-1] < data['long_sma'].iloc[-1] and \
-            data['volume'].iloc[-1] > data['volume_sma'].iloc[-1]:
-        return 'sell'
+    if float(data['short_sma'].iloc[-2]) < float(data['long_sma'].iloc[-2]) and \
+        float(data['short_sma'].iloc[-1]) > float(data['long_sma'].iloc[-1]) and \
+        float(data['volume'].iloc[-1]) > float(data['volume_sma'].iloc[-1]):
+        return 'Buy'
+
+    elif float(data['short_sma'].iloc[-2]) > float(data['long_sma'].iloc[-2]) and \
+            float(data['short_sma'].iloc[-1]) < float(data['long_sma'].iloc[-1]) and \
+            float(data['volume'].iloc[-1]) > float(data['volume_sma'].iloc[-1]):
+        return 'Sell'
     else:
         return None
 
@@ -219,6 +226,7 @@ def execute_trade(side: str, risk_percentage: float, current_price: float) -> No
     stop_loss, take_profit = calculate_stop_loss_take_profit(current_price, risk_reward_ratio, side)
     logging.info(f"Stop Loss: {stop_loss} | Take Profit: {take_profit}")
 
+    #"""
     # Place an order on Bybit using the REST API
     order = client.place_order(
         category="linear",
@@ -239,6 +247,7 @@ def execute_trade(side: str, risk_percentage: float, current_price: float) -> No
         last_order_time = datetime.now()
     else:
         logging.error(f"Failed to execute order: {order['ret_msg']}")
+    #"""
 
 # Fetch historical data
 data = fetch_historical_data(symbol, timeframe)
@@ -250,7 +259,5 @@ logging.info(f"Symbol: {symbol} | Timeframe: {timeframe} | Close: {data['close']
 signal = check_sma_crossover(data)
 
 # Execute trade
-if signal == 'buy':
-    execute_trade('Buy', risk_percentage, data['close'].iloc[-1])
-elif signal == 'sell':
-    execute_trade('Sell', risk_percentage, data['close'].iloc[-1])
+if signal != '':
+    execute_trade(signal, risk_percentage, data['close'].iloc[-1])
